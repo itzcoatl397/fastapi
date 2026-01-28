@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.params import Query, Body
+from pydantic import BaseModel
+
+from schemas.post_schema import PostBase, PostCreate, PostUpdate
 
 app = FastAPI()
 
@@ -57,6 +60,7 @@ POSTS = [
 ]
 
 
+
 @app.get("/")
 def main():
     return {"message": "Bienvenidos a  mi blog"}
@@ -97,19 +101,12 @@ def get_post(
 
 
 @app.post("/posts")
-def create_post(post: dict = Body(...)):
-    if "title" not in post or "content" not in post:
-        return {"error", "Title  y Content son requerido"}
-
-    if not str(post["title"]).strip():
-        return {"error", "Title no puede estar vacio"}
-
-
-    new_id =(POSTS[-1]["id"] + 1) if post else 1
+def create_post(post: PostCreate):
+    new_id = (POSTS[-1]["id"] + 1) if post else 1
     new_post = {
         "id": new_id,
-        "title": post["title"],
-        "content": post["content"]
+        "title": post.title,
+        "content":post.content,
     }
     POSTS.append(new_post)
 
@@ -121,26 +118,36 @@ def create_post(post: dict = Body(...)):
     }
 
 
-
 @app.put("/posts/{id}")
 def update_post(
         id: int,
-        postJson: dict = Body(...),
+        postJson:PostUpdate,
 ):
-    if "title" not in postJson or "content" not in postJson:
-        return {"error", "Title  y Content son requerido"}
-
-    if not str(postJson["title"]).strip():
-        return {"error", "Title no puede estar vacio"}
-
-
     for post in POSTS:
         if post["id"] == id:
 
-            post["title"] = postJson["title"]
-            post["content"] = postJson["content"]
+            playload = postJson.model_dump(exclude_unset=True)
+
+            if "title" in playload: post["title"] = postJson["title"]
+
+            if "content" in playload: post["content"] = postJson["content"]
+            return {
+                "status_code": 200,
+                "message": "Post updated successfully",
+                "data": post
+            }
+    raise HTTPException(status_code=404, detail="Post not found")
 
 
+@app.delete("/posts/{id}")
+
+def delete_post(id: int,status_code = 204):
+    for index,post in enumerate(POSTS):
+        if post["id"] == id:
+            POSTS.pop(index)
+            return
+
+    raise HTTPException(status_code=404, detail="Post not found")
 
 
 
